@@ -86,6 +86,7 @@ usort($entries, fn($a,$b) => $b['mtime'] <=> $a['mtime']);
     <div>
       <h1>WebFTP Root</h1>
       <div class="path">/ (Root) → /daten</div>
+      <p><a href="/" class="path">&larr; Zurück zur Startseite</a></p>
     </div>
     <form method="post" enctype="multipart/form-data">
       <label class="btn-upload">

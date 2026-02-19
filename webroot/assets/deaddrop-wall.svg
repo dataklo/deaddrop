@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">Dead Drop in Ziegelwand</title>
+  <desc id="desc">Illustration eines USB-Sticks in einer gemauerten Wand, lokal bereitgestellt als SVG.</desc>
+  <defs>
+    <linearGradient id="brick" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#cb6a45"/>
+      <stop offset="1" stop-color="#a24d31"/>
+    </linearGradient>
+    <filter id="noise" x="-20%" y="-20%" width="140%" height="140%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" stitchTiles="stitch"/>
+      <feColorMatrix type="saturate" values="0.2"/>
+      <feBlend mode="multiply" in2="SourceGraphic"/>
+    </filter>
+  </defs>
+
+  <rect width="1200" height="800" fill="#8e3f28"/>
+
+  <g fill="url(#brick)">
+    <rect x="0" y="0" width="1200" height="120"/>
+    <rect x="0" y="140" width="1200" height="120"/>
+    <rect x="0" y="280" width="1200" height="120"/>
+    <rect x="0" y="420" width="1200" height="120"/>
+    <rect x="0" y="560" width="1200" height="120"/>
+    <rect x="0" y="700" width="1200" height="100"/>
+  </g>
+
+  <g stroke="#b88a78" stroke-width="18" opacity="0.75">
+    <line x1="0" y1="130" x2="1200" y2="130"/>
+    <line x1="0" y1="270" x2="1200" y2="270"/>
+    <line x1="0" y1="410" x2="1200" y2="410"/>
+    <line x1="0" y1="550" x2="1200" y2="550"/>
+    <line x1="0" y1="690" x2="1200" y2="690"/>
+  </g>
+
+  <g stroke="#b88a78" stroke-width="14" opacity="0.6">
+    <line x1="200" y1="0" x2="200" y2="120"/>
+    <line x1="600" y1="0" x2="600" y2="120"/>
+    <line x1="1000" y1="0" x2="1000" y2="120"/>
+
+    <line x1="0" y1="140" x2="400" y2="140"/>
+    <line x1="400" y1="140" x2="400" y2="260"/>
+    <line x1="800" y1="140" x2="800" y2="260"/>
+
+    <line x1="200" y1="280" x2="200" y2="400"/>
+    <line x1="600" y1="280" x2="600" y2="400"/>
+    <line x1="1000" y1="280" x2="1000" y2="400"/>
+
+    <line x1="0" y1="420" x2="400" y2="420"/>
+    <line x1="400" y1="420" x2="400" y2="540"/>
+    <line x1="800" y1="420" x2="800" y2="540"/>
+
+    <line x1="200" y1="560" x2="200" y2="680"/>
+    <line x1="600" y1="560" x2="600" y2="680"/>
+    <line x1="1000" y1="560" x2="1000" y2="680"/>
+  </g>
+
+  <g>
+    <ellipse cx="665" cy="355" rx="145" ry="108" fill="#c4c4c4"/>
+    <ellipse cx="665" cy="355" rx="130" ry="92" fill="#bdbdbd"/>
+  </g>
+
+  <g>
+    <rect x="620" y="338" width="152" height="36" rx="4" fill="#141414"/>
+    <rect x="745" y="336" width="72" height="40" rx="3" fill="#c7c7c7"/>
+    <rect x="760" y="349" width="10" height="9" fill="#515151"/>
+    <rect x="779" y="349" width="10" height="9" fill="#515151"/>
+    <rect x="612" y="342" width="12" height="27" fill="#080808"/>
+  </g>
+
+  <rect width="1200" height="800" fill="transparent" filter="url(#noise)" opacity="0.08"/>
+</svg>
