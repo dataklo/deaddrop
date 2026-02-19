@@ -73,7 +73,7 @@ if [[ -z "$LAN_IFACE" ]]; then
   LAN_IFACE="${LAN_IFACE:-eth1}"
 fi
 
-bash "$REPO_ROOT/scripts/install.sh" --wan-if "$WAN_IFACE" --lan-if "$LAN_IFACE" --non-interactive
+bash "$REPO_ROOT/scripts/install.sh" --wan-if "$WAN_IFACE" --lan-if "$LAN_IFACE" --non-interactive --preserve-runtime-dirs
 
 popd >/dev/null
 
