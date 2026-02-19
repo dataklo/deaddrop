@@ -51,6 +51,31 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y dnsmasq nginx php-fpm vsftpd rsync curl netplan.io clamav clamav-daemon file nftables
 
+configure_lan_ssh_key_only() {
+  local ssh_dropin_dir="/etc/ssh/sshd_config.d"
+  local ssh_dropin_file="${ssh_dropin_dir}/50-deaddrop-lan-keyonly.conf"
+
+  if [[ ! -d "$ssh_dropin_dir" ]] || ! command -v sshd >/dev/null 2>&1; then
+    echo "Hinweis: OpenSSH-Server nicht gefunden, überspringe LAN-only SSH-Härtung."
+    return
+  fi
+
+  mkdir -p "$ssh_dropin_dir"
+  cat >"$ssh_dropin_file" <<SSHCFG
+Match Address 172.16.0.0/24
+    PubkeyAuthentication yes
+    PasswordAuthentication no
+    KbdInteractiveAuthentication no
+SSHCFG
+
+  if sshd -t; then
+    systemctl restart ssh || systemctl restart sshd || true
+  else
+    echo "Warnung: sshd-Konfiguration ungültig, entferne ${ssh_dropin_file}." >&2
+    rm -f "$ssh_dropin_file"
+  fi
+}
+
 mkdir -p /etc/netplan
 cat >/etc/netplan/99-deaddrop.yaml <<NETPLAN
 network:
@@ -149,10 +174,14 @@ ln -sfn /var/www/deaddrop/upload /var/www/deaddrop/upload-link
 systemctl enable vsftpd
 systemctl restart vsftpd
 
+# SSH-Härtung nur für das interne LAN (WAN bleibt bei System-Defaults)
+configure_lan_ssh_key_only
+
 cat <<MSG
 Fertig.
 - WAN: ${WAN_IFACE} via DHCP (VM bleibt updatefähig)
 - LAN: ${LAN_IFACE} = 172.16.0.1/24, IPv6 deaktiviert, komplett ohne Internet-Forwarding
+- SSH auf LAN (172.16.0.0/24): key-only; WAN unverändert (System-Defaults)
 - DNS wildcard + Captive auf LAN
 - WebFTP Root: http://deaddrop.internal/webftp/
 - Upload-Flow: /upload (write-only) -> AV-Scan -> /daten (read-only)
