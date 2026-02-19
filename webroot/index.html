@@ -8,29 +8,58 @@
 </head>
 <body>
   <main class="container">
-    <section class="hero">
-      <h1>WIRELESS DEAD DROP</h1>
-      <p>Offline Datentausch im öffentlichen Raum – inspiriert vom DeadDrop-Stil.</p>
-      <p class="muted">Portal-IP: <strong>deaddrop.internal</strong></p>
+    <section class="hero hero-layout">
+      <div>
+        <h1>WIRELESS DEAD DROP</h1>
+        <p>Ein anonymer, lokaler Peer-to-Peer-Dateiaustausch im öffentlichen Raum – ohne Cloud, ohne Benutzerkonten, ohne Tracking.</p>
+        <p class="muted">Portal-IP: <strong>deaddrop.internal</strong></p>
+      </div>
+      <figure class="hero-image">
+        <img src="/assets/deaddrop-wall.svg" alt="In eine Mauer eingelassener USB-Stick als Dead Drop" />
+      </figure>
     </section>
 
     <section class="notice">
-      <strong>Hinweis:</strong> Dieses WLAN bietet absichtlich keinen Internetzugang. Alle DNS-Anfragen werden auf dieses Portal umgeleitet.
+      <strong>Wichtig:</strong> Dieses WLAN ist absichtlich offline. Es gibt hier keinen Internetzugang; alle DNS-Anfragen landen auf diesem lokalen Portal.
+    </section>
+
+    <section class="card">
+      <h2>Was ist ein Dead Drop?</h2>
+      <p>Ein Dead Drop ist ein öffentlich zugänglicher, anonymer Datenaustauschpunkt. Ursprünglich wurden USB-Sticks in Mauern, Gebäuden oder Pollern verbaut, sodass jede Person vor Ort Dateien ablegen oder mitnehmen konnte.</p>
+      <p>Diese Wireless-Variante übernimmt die gleiche Idee: Statt eines physischen USB-Anschlusses verbindet man sich mit einem lokalen WLAN und tauscht Daten direkt auf diesem System aus.</p>
+    </section>
+
+    <section class="card">
+      <h2>Wozu ist das da?</h2>
+      <ul>
+        <li>Für freien, lokalen Dateiaustausch ohne zentrale Plattform.</li>
+        <li>Für Kunst-, Community- und Nachbarschaftsprojekte im öffentlichen Raum.</li>
+        <li>Für den Austausch von Texten, Bildern, PDFs und Dokumenten ohne Registrierung.</li>
+        <li>Als bewusstes Gegenmodell zu kommerziellen Online-Diensten.</li>
+      </ul>
+    </section>
+
+    <section class="card">
+      <h2>Wie funktioniert diese Station?</h2>
+      <ol>
+        <li>Mit dem DeadDrop-WLAN verbinden.</li>
+        <li>Den Haftungshinweis lesen und bestätigen.</li>
+        <li>Dateien im WebFTP hochladen oder vorhandene Dateien herunterladen.</li>
+        <li>Uploads werden lokal geprüft und danach für alle sichtbar in <code>/daten</code> bereitgestellt.</li>
+      </ol>
+      <p>Der gesamte Inhalt liegt lokal auf diesem Gerät. Es werden keine externen Ressourcen von Drittseiten geladen.</p>
+    </section>
+
+    <section class="card quote-card">
+      <h2>Projektidee (historischer Kontext)</h2>
+      <p>Die Dead-Drop-Idee wurde 2010 als künstlerisches, offenes Beteiligungsprojekt bekannt: Menschen sollten an öffentlichen Orten anonym Dateien teilen können, ohne zentrale Infrastruktur und ohne Accounts. Jede Installation startet leer (typisch mit einer kurzen Readme) und lebt durch Beiträge der Teilnehmenden.</p>
+      <p class="muted">Angelehnt an die ursprüngliche Projektbeschreibung von Aram Bartholl (2010), hier in deutscher Zusammenfassung.</p>
     </section>
 
     <section class="card">
       <h2>Start</h2>
       <p>Bevor du Dateien hochlädst oder herunterlädst, lies bitte den Haftungshinweis.</p>
       <p><a class="btn" href="/disclaimer.html">Zum Haftungshinweis</a></p>
-    </section>
-
-    <section class="card">
-      <h2>Weitere Inhalte</h2>
-      <ul>
-        <li><a href="/manifest.html">Manifest (HTML)</a></li>
-        <li><a href="/DeadDrop-manifest.txt">DeadDrop-manifest.txt</a></li>
-        <li><a href="/readme-ger.md">readme-ger.md</a></li>
-      </ul>
     </section>
   </main>
 </body>
