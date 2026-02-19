@@ -88,6 +88,8 @@ network:
       optional: true
       dhcp4-overrides:
         route-metric: 100
+      dhcp6-overrides:
+        route-metric: 100
     ${LAN_IFACE}:
       dhcp4: false
       dhcp6: false
@@ -96,6 +98,7 @@ network:
       addresses: [172.16.0.1/24]
       optional: true
 NETPLAN
+chmod 600 /etc/netplan/99-deaddrop.yaml
 netplan generate
 netplan apply || true
 
