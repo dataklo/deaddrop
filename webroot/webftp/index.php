@@ -9,7 +9,10 @@ if ($baseDir === false) {
 
 $dataDir = $baseDir . '/daten';
 $uploadDir = $baseDir . '/upload';
-$softDeleteFile = $dataDir . '/.hidden-files.json';
+$trashDir = $dataDir . '/.trash';
+$storageLimitBytes = 10 * 1024 * 1024 * 1024;
+$maxUploadBytes = 50 * 1024 * 1024;
+$trashRetentionSeconds = 90 * 24 * 60 * 60;
 $allowedExt = [
   'jpg','jpeg','png','gif','webp','bmp','svg',
   'pdf','txt','md','rtf',
@@ -23,33 +26,89 @@ $msg = '';
 
 if (!is_dir($dataDir)) { @mkdir($dataDir, 0755, true); }
 if (!is_dir($uploadDir)) { @mkdir($uploadDir, 0733, true); }
+if (!is_dir($trashDir)) { @mkdir($trashDir, 0755, true); }
 
-function loadSoftDeleted(string $softDeleteFile): array {
-    if (!is_file($softDeleteFile)) {
-        return [];
-    }
-    $raw = @file_get_contents($softDeleteFile);
-    if ($raw === false || trim($raw) === '') {
-        return [];
-    }
-    $decoded = json_decode($raw, true);
-    if (!is_array($decoded)) {
-        return [];
+function directorySize(string $path): int {
+    if (!is_dir($path)) {
+        return 0;
     }
 
-    $normalized = [];
-    foreach ($decoded as $item) {
-        if (is_string($item) && $item !== '') {
-            $normalized[$item] = true;
+    $size = 0;
+    $iterator = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator($path, FilesystemIterator::SKIP_DOTS)
+    );
+
+    foreach ($iterator as $fileInfo) {
+        if ($fileInfo->isFile()) {
+            $size += $fileInfo->getSize();
         }
     }
-    return $normalized;
+
+    return $size;
 }
 
-function saveSoftDeleted(string $softDeleteFile, array $deletedMap): bool {
-    $list = array_keys($deletedMap);
-    sort($list);
-    return @file_put_contents($softDeleteFile, json_encode($list, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES)) !== false;
+function formatBytes(int $bytes): string {
+    $units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    $size = max(0, $bytes);
+    $pow = ($size > 0) ? (int)floor(log($size, 1024)) : 0;
+    $pow = min($pow, count($units) - 1);
+    $value = $size / (1024 ** $pow);
+    return number_format($value, $pow === 0 ? 0 : 1, ',', '.') . ' ' . $units[$pow];
+}
+
+function removeDirectoryIfEmpty(string $dir, string $stopAt): void {
+    $current = $dir;
+    while ($current !== $stopAt && str_starts_with($current, $stopAt)) {
+        if (!is_dir($current)) {
+            break;
+        }
+        $entries = @scandir($current) ?: [];
+        if (count($entries) > 2) {
+            break;
+        }
+        @rmdir($current);
+        $current = dirname($current);
+    }
+}
+
+function deleteFileOrDir(string $path): void {
+    if (is_file($path) || is_link($path)) {
+        @unlink($path);
+        return;
+    }
+    if (!is_dir($path)) {
+        return;
+    }
+    $items = @scandir($path) ?: [];
+    foreach ($items as $item) {
+        if ($item === '.' || $item === '..') {
+            continue;
+        }
+        deleteFileOrDir($path . '/' . $item);
+    }
+    @rmdir($path);
+}
+
+function purgeExpiredTrash(string $trashDir, int $retentionSeconds): void {
+    if (!is_dir($trashDir)) {
+        return;
+    }
+
+    $threshold = time() - $retentionSeconds;
+    $entries = @scandir($trashDir) ?: [];
+    foreach ($entries as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $trashDir . '/' . $entry;
+        $mtime = @filemtime($path);
+        if ($mtime === false) {
+            continue;
+        }
+        if ($mtime <= $threshold) {
+            deleteFileOrDir($path);
+        }
+    }
 }
 
 function sendTelegramUploadNotification(string $filename, string $folder): void {
@@ -75,29 +134,52 @@ function sendTelegramUploadNotification(string $filename, string $folder): void 
     @file_get_contents($url, false, $ctx);
 }
 
-$softDeleted = loadSoftDeleted($softDeleteFile);
+purgeExpiredTrash($trashDir, $trashRetentionSeconds);
+$usedBytes = directorySize($dataDir) + directorySize($uploadDir);
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['delete_path'])) {
     $deletePath = trim((string)$_POST['delete_path']);
     if ($deletePath === '' || strpos($deletePath, '..') !== false) {
         $msg = 'Ungültiger Löschpfad.';
     } else {
-        $softDeleted[$deletePath] = true;
-        if (saveSoftDeleted($softDeleteFile, $softDeleted)) {
-            $msg = 'Datei wurde ausgeblendet (soft gelöscht).';
+        $target = $dataDir . '/' . $deletePath;
+        if (!is_file($target)) {
+            $msg = 'Datei wurde nicht gefunden.';
         } else {
-            $msg = 'Datei konnte nicht ausgeblendet werden.';
+            $trashName = date('Ymd_His') . '_' . bin2hex(random_bytes(4)) . '_' . basename($deletePath);
+            $trashTarget = $trashDir . '/' . $trashName;
+            if (!@rename($target, $trashTarget)) {
+                $msg = 'Datei konnte nicht gelöscht werden.';
+            } else {
+                removeDirectoryIfEmpty(dirname($target), $dataDir);
+                $msg = 'Datei wurde gelöscht.';
+            }
         }
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
-    if ($_FILES['file']['error'] === UPLOAD_ERR_OK) {
-        $origName = basename($_FILES['file']['name']);
-        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+    $errorCode = (int)($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE);
 
-        if (in_array($ext, $blockedExt, true) || !in_array($ext, $allowedExt, true)) {
+    if ($errorCode === UPLOAD_ERR_INI_SIZE || $errorCode === UPLOAD_ERR_FORM_SIZE) {
+        $msg = 'Upload fehlgeschlagen: Maximale Dateigröße ist 50 MB.';
+    } elseif ($errorCode === UPLOAD_ERR_PARTIAL) {
+        $msg = 'Upload unvollständig. Bitte erneut versuchen.';
+    } elseif ($errorCode === UPLOAD_ERR_NO_FILE) {
+        $msg = 'Bitte eine Datei auswählen.';
+    } elseif ($errorCode !== UPLOAD_ERR_OK) {
+        $msg = 'Upload fehlgeschlagen. Bitte später erneut versuchen.';
+    } else {
+        $origName = basename((string)$_FILES['file']['name']);
+        $ext = strtolower(pathinfo($origName, PATHINFO_EXTENSION));
+        $fileSize = (int)$_FILES['file']['size'];
+
+        if ($fileSize > $maxUploadBytes) {
+            $msg = 'Datei zu groß. Maximal erlaubt sind 50 MB.';
+        } elseif (in_array($ext, $blockedExt, true) || !in_array($ext, $allowedExt, true)) {
             $msg = 'Dateityp nicht erlaubt.';
+        } elseif ($usedBytes + $fileSize > $storageLimitBytes) {
+            $msg = 'Speicherlimit von 10 GB erreicht. Upload nicht möglich.';
         } else {
             $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $origName);
             $staged = $uploadDir . '/' . uniqid('up_', true) . '_' . $safeName;
@@ -116,7 +198,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
 
                 if ($rc === 0) {
                     $target = $dateDir . '/' . $safeName;
-                    $relativePath = $dateDirName . '/' . $safeName;
                     if (is_file($target)) {
                         @unlink($target);
                     }
@@ -124,19 +205,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
                         @unlink($staged);
                         $msg = 'Datei konnte nicht übernommen werden.';
                     } else {
-                        unset($softDeleted[$relativePath]);
-                        saveSoftDeleted($softDeleteFile, $softDeleted);
                         sendTelegramUploadNotification($safeName, $dateDirName);
-                        $msg = 'Upload erfolgreich. Gespeichert unter /daten/' . $dateDirName . '/';
+                        $msg = 'Upload erfolgreich. Datei ist jetzt im Archiv sichtbar.';
                     }
                 } else {
                     @unlink($staged);
-                    $msg = 'Upload verarbeitet.';
+                    $msg = 'Upload wurde aus Sicherheitsgründen abgelehnt.';
                 }
             }
         }
-    } else {
-        $msg = 'Upload-Fehler.';
     }
 }
 
@@ -148,24 +225,33 @@ if (is_dir($dataDir)) {
         $dayPath = $dataDir . '/' . $dayFolder;
         if (!is_dir($dayPath)) continue;
 
-        $days[$dayFolder] = true;
         foreach (scandir($dayPath) as $f) {
             if ($f === '.' || $f === '..') continue;
             $p = $dayPath . '/' . $f;
             if (!is_file($p)) continue;
 
-            $relativePath = $dayFolder . '/' . $f;
-            if (isset($softDeleted[$relativePath])) continue;
-
             $entries[] = [
               'name' => $f,
               'folder' => $dayFolder,
-              'path' => $relativePath,
+              'path' => $dayFolder . '/' . $f,
               'size' => filesize($p),
+              'sizeHuman' => formatBytes((int)filesize($p)),
               'mtime' => filemtime($p)
             ];
+            $days[$dayFolder] = true;
         }
     }
+}
+
+$usedBytes = directorySize($dataDir) + directorySize($uploadDir);
+$freeBytes = max(0, $storageLimitBytes - $usedBytes);
+$freePercent = ($storageLimitBytes > 0) ? ($freeBytes / $storageLimitBytes) * 100 : 0;
+$usedPercent = 100 - $freePercent;
+$storageClass = 'storage-fill-ok';
+if ($freePercent < 5) {
+    $storageClass = 'storage-fill-critical';
+} elseif ($freePercent < 15) {
+    $storageClass = 'storage-fill-warn';
 }
 
 $selectedDay = isset($_GET['day']) ? trim((string)$_GET['day']) : '';
@@ -178,6 +264,10 @@ if ($selectedDay !== '' && isset($days[$selectedDay])) {
 $dayOptions = array_keys($days);
 rsort($dayOptions);
 usort($entries, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
+$msgClass = 'notice';
+if (str_starts_with($msg, 'Upload erfolgreich')) {
+    $msgClass .= ' notice-success';
+}
 ?><!doctype html>
 <html lang="de">
 <head>
@@ -186,12 +276,23 @@ usort($entries, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
   <title>WebFTP Root</title>
   <link rel="stylesheet" href="/styles.css" />
   <style>
-    .topbar{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+    .topbar{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap}
     .btn-upload{background:#b10000;color:#fff;padding:.6rem .9rem;border-radius:4px;border:0;cursor:pointer}
     .btn-delete{background:#333;color:#fff;padding:.35rem .6rem;border-radius:4px;border:0;cursor:pointer;font-size:.85rem}
     .path{font-family:monospace;color:#bbb}
     .file-row{display:flex;gap:.75rem;align-items:center;justify-content:space-between;flex-wrap:wrap}
     .filter-form{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+    .storage{font-size:.95rem;color:#ddd;margin-top:.35rem;max-width:460px}
+    .storage-meta{display:flex;justify-content:space-between;gap:.75rem;flex-wrap:wrap}
+    .storage-bar{width:100%;height:.7rem;background:#2a2a2a;border-radius:999px;overflow:hidden;margin-top:.4rem}
+    .storage-fill-ok{height:100%;background:#4fb86f}
+    .storage-fill-warn{height:100%;background:#cc9f3f}
+    .storage-fill-critical{height:100%;background:#c44747}
+    .notice-success{border-color:#2f7d43;background:#12351d}
+    .upload-form{min-width:280px}
+    .upload-controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+    .btn-upload-progress{display:none;margin-top:.6rem}
+    .btn-upload-progress progress{width:100%}
   </style>
 </head>
 <body>
@@ -200,17 +301,31 @@ usort($entries, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
     <div>
       <h1>WebFTP Root</h1>
       <div class="path">/ (Root) → /daten</div>
+      <div class="storage">
+        <div><?= number_format($freePercent, 2, ',', '.') ?>% frei von 10GB</div>
+        <div class="storage-meta">
+          <span>Belegt: <?= htmlspecialchars(formatBytes((int)$usedBytes), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+          <span>Frei: <?= htmlspecialchars(formatBytes((int)$freeBytes), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></span>
+        </div>
+        <div class="storage-bar"><div class="<?= htmlspecialchars($storageClass, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>" style="width: <?= htmlspecialchars((string)max(0, min(100, $usedPercent)), ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>%"></div></div>
+      </div>
       <p><a href="/" class="path">&larr; Zurück zur Startseite</a></p>
     </div>
-    <form method="post" enctype="multipart/form-data">
-      <label class="btn-upload">
-        Upload
-        <input type="file" name="file" style="display:none" onchange="this.form.submit()" required>
-      </label>
+    <form method="post" enctype="multipart/form-data" id="uploadForm" class="upload-form">
+      <input type="hidden" name="MAX_FILE_SIZE" value="<?= (int)$maxUploadBytes ?>">
+      <div class="upload-controls">
+        <input type="file" name="file" id="fileInput" required>
+        <button type="submit" class="btn-upload">Upload</button>
+      </div>
+      <div class="path" style="margin-top:.4rem">maximale dateigröße 50 MB</div>
+      <div class="btn-upload-progress" id="uploadProgressWrap">
+        <progress id="uploadProgress" value="0" max="100"></progress>
+        <div id="uploadProgressText" class="path">Upload startet…</div>
+      </div>
     </form>
   </section>
 
-  <?php if ($msg): ?><section class="notice"><p><?= htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p></section><?php endif; ?>
+  <?php if ($msg): ?><section class="<?= htmlspecialchars($msgClass, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"><p><?= htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p></section><?php endif; ?>
 
   <section class="card">
     <h2>Dateien in /daten/JJJJ-MM-TT</h2>
@@ -235,9 +350,9 @@ usort($entries, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
           <li class="file-row">
             <div>
               <a href="/daten/<?= rawurlencode($e['path']) ?>"><?= htmlspecialchars($e['folder'] . '/' . $e['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></a>
-              <small>(<?= (int)$e['size'] ?> bytes)</small>
+              <small>(<?= htmlspecialchars($e['sizeHuman'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>)</small>
             </div>
-            <form method="post" onsubmit="return confirm('Datei wirklich löschen? (wird nur ausgeblendet)');">
+            <form method="post" onsubmit="return confirm('Datei wirklich löschen?');">
               <input type="hidden" name="delete_path" value="<?= htmlspecialchars($e['path'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>">
               <button type="submit" class="btn-delete">Löschen</button>
             </form>
@@ -247,5 +362,48 @@ usort($entries, fn($a, $b) => $b['mtime'] <=> $a['mtime']);
     <?php endif; ?>
   </section>
 </main>
+<script>
+(() => {
+  const form = document.getElementById('uploadForm');
+  const progressWrap = document.getElementById('uploadProgressWrap');
+  const progressBar = document.getElementById('uploadProgress');
+  const progressText = document.getElementById('uploadProgressText');
+  if (!form || !progressWrap || !progressBar || !progressText) return;
+
+  form.addEventListener('submit', (event) => {
+    const fileInput = document.getElementById('fileInput');
+    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+      return;
+    }
+
+    event.preventDefault();
+    const xhr = new XMLHttpRequest();
+    const formData = new FormData(form);
+
+    progressWrap.style.display = 'block';
+    progressBar.value = 0;
+    progressText.textContent = 'Upload läuft… 0%';
+
+    xhr.upload.addEventListener('progress', (e) => {
+      if (!e.lengthComputable) return;
+      const percent = Math.round((e.loaded / e.total) * 100);
+      progressBar.value = percent;
+      progressText.textContent = `Upload läuft… ${percent}%`;
+    });
+
+    xhr.addEventListener('load', () => {
+      progressText.textContent = 'Upload abgeschlossen. Seite wird aktualisiert…';
+      window.location.reload();
+    });
+
+    xhr.addEventListener('error', () => {
+      progressText.textContent = 'Upload fehlgeschlagen. Bitte erneut versuchen.';
+    });
+
+    xhr.open('POST', window.location.href);
+    xhr.send(formData);
+  });
+})();
+</script>
 </body>
 </html>
