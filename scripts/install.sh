@@ -165,11 +165,12 @@ if [[ $PRESERVE_RUNTIME_DIRS -eq 1 ]]; then
     -exec chown root:root {} +
 else
   chown -R root:root /var/www/deaddrop
-  chown -R www-data:www-data /var/www/deaddrop/daten
-  chmod 0755 /var/www/deaddrop/daten
-  chown -R www-data:www-data /var/www/deaddrop/upload
-  chmod 0733 /var/www/deaddrop/upload
 fi
+
+chown -R www-data:www-data /var/www/deaddrop/daten
+chmod 0755 /var/www/deaddrop/daten
+chown -R www-data:www-data /var/www/deaddrop/upload
+chmod 0733 /var/www/deaddrop/upload
 chmod 0555 /var/www/deaddrop
 chown -R www-data:www-data /var/www/deaddrop/webftp
 chmod -R 0755 /var/www/deaddrop/webftp

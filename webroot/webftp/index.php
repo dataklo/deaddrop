@@ -26,29 +26,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
         } else {
             $safeName = preg_replace('/[^A-Za-z0-9._-]/', '_', $origName);
             $staged = $uploadDir . '/' . uniqid('up_', true) . '_' . $safeName;
+            $dateDirName = date('Y-m-d');
+            $dateDir = $dataDir . '/' . $dateDirName;
 
-            if (move_uploaded_file($_FILES['file']['tmp_name'], $staged)) {
+            if (!is_dir($dateDir) && !@mkdir($dateDir, 0755, true)) {
+                $msg = 'Tagesordner konnte nicht erstellt werden.';
+            } elseif (!is_writable($uploadDir)) {
+                $msg = 'Upload-Verzeichnis nicht beschreibbar.';
+            } elseif (!move_uploaded_file($_FILES['file']['tmp_name'], $staged)) {
+                $msg = 'Upload fehlgeschlagen. Bitte später erneut versuchen.';
+            } else {
                 // AV scan: suspicious files are removed silently.
                 $scanCmd = 'clamscan --no-summary ' . escapeshellarg($staged) . ' >/dev/null 2>&1';
                 exec($scanCmd, $o, $rc);
 
                 if ($rc === 0) {
-                    $target = $dataDir . '/' . $safeName;
+                    $target = $dateDir . '/' . $safeName;
                     if (file_exists($target)) {
-                        $target = $dataDir . '/' . pathinfo($safeName, PATHINFO_FILENAME) . '_' . time() . '.' . $ext;
+                        $target = $dateDir . '/' . pathinfo($safeName, PATHINFO_FILENAME) . '_' . time() . '.' . $ext;
                     }
                     if (!@rename($staged, $target)) {
                         @unlink($staged);
                         $msg = 'Datei konnte nicht übernommen werden.';
                     } else {
-                        $msg = 'Upload erfolgreich.';
+                        $msg = 'Upload erfolgreich. Gespeichert unter /daten/' . $dateDirName . '/';
                     }
                 } else {
                     @unlink($staged); // no comment per requirement
                     $msg = 'Upload verarbeitet.';
                 }
-            } else {
-                $msg = 'Upload fehlgeschlagen.';
             }
         }
     } else {
@@ -58,11 +64,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['file'])) {
 
 $entries = [];
 if (is_dir($dataDir)) {
-    foreach (scandir($dataDir) as $f) {
-        if ($f === '.' || $f === '..') continue;
-        $p = $dataDir . '/' . $f;
-        if (is_file($p)) {
-            $entries[] = ['name' => $f, 'size' => filesize($p), 'mtime' => filemtime($p)];
+    foreach (scandir($dataDir) as $dayFolder) {
+        if ($dayFolder === '.' || $dayFolder === '..') continue;
+        $dayPath = $dataDir . '/' . $dayFolder;
+        if (!is_dir($dayPath)) continue;
+        foreach (scandir($dayPath) as $f) {
+            if ($f === '.' || $f === '..') continue;
+            $p = $dayPath . '/' . $f;
+            if (is_file($p)) {
+                $entries[] = [
+                  'name' => $f,
+                  'folder' => $dayFolder,
+                  'path' => $dayFolder . '/' . $f,
+                  'size' => filesize($p),
+                  'mtime' => filemtime($p)
+                ];
+            }
         }
     }
 }
@@ -99,11 +116,11 @@ usort($entries, fn($a,$b) => $b['mtime'] <=> $a['mtime']);
   <?php if ($msg): ?><section class="notice"><p><?= htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p></section><?php endif; ?>
 
   <section class="card">
-    <h2>Dateien in /daten</h2>
+    <h2>Dateien in /daten/JJJJ-MM-TT</h2>
     <ul>
       <?php foreach ($entries as $e): ?>
         <li>
-          <a href="/daten/<?= rawurlencode($e['name']) ?>"><?= htmlspecialchars($e['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></a>
+          <a href="/daten/<?= rawurlencode($e['path']) ?>"><?= htmlspecialchars($e['folder'] . '/' . $e['name'], ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></a>
           <small>(<?= (int)$e['size'] ?> bytes)</small>
         </li>
       <?php endforeach; ?>
