@@ -328,7 +328,7 @@ if (str_starts_with($msg, 'Upload erfolgreich')) {
   <?php if ($msg): ?><section class="<?= htmlspecialchars($msgClass, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?>"><p><?= htmlspecialchars($msg, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8') ?></p></section><?php endif; ?>
 
   <section class="card">
-    <h2>Dateien in /daten/JJJJ-MM-TT</h2>
+    <h2>Hochgeladene Dateien</h2>
     <form method="get" class="filter-form">
       <label for="day">Tag auswählen:</label>
       <select id="day" name="day" onchange="this.form.submit()">
@@ -370,8 +370,9 @@ if (str_starts_with($msg, 'Upload erfolgreich')) {
   const progressText = document.getElementById('uploadProgressText');
   if (!form || !progressWrap || !progressBar || !progressText) return;
 
+  const fileInput = document.getElementById('fileInput');
+
   form.addEventListener('submit', (event) => {
-    const fileInput = document.getElementById('fileInput');
     if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
       return;
     }
@@ -392,6 +393,7 @@ if (str_starts_with($msg, 'Upload erfolgreich')) {
     });
 
     xhr.addEventListener('load', () => {
+      fileInput.value = '';
       progressText.textContent = 'Upload abgeschlossen. Seite wird aktualisiert…';
       window.location.reload();
     });
