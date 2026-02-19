@@ -29,7 +29,9 @@
 
 Die WebFTP-Ansicht bietet zusätzlich:
 - Dropdown-Filter nach Upload-Tag
-- Soft-Delete-Button (Dateien werden nur ausgeblendet, nicht physisch gelöscht)
+- Lösch-Button mit versteckter Aufbewahrung: gelöschte Dateien sind sofort unsichtbar und werden nach 3 Monaten dauerhaft entfernt
+- Speicheranzeige (`x% frei von 10GB`) inklusive Upload-Limit
+- maximale Dateigröße pro Upload: 50 MB
 - optionale Telegram-Benachrichtigung bei Uploads (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`)
 
 ## Dateiregeln
@@ -93,3 +95,17 @@ Optional mit festem Stand (Branch/Tag/Commit):
 ```bash
 sudo bash scripts/update.sh --git-ref main
 ```
+
+## Wo liegen die Dateien auf dem Server?
+
+- Basisverzeichnis der Installation: `/var/www/deaddrop`
+- Sichtbare Uploads liegen physisch unter: `/var/www/deaddrop/daten/JJJJ-MM-TT/`
+- Temporäre Upload-Zone (vor Virenscan): `/var/www/deaddrop/upload/`
+
+Die WebFTP-Oberfläche zeigt Inhalte aus `/daten` an, technisch entspricht das auf dem Server `/var/www/deaddrop/daten`.
+
+
+## Interne Statusseite
+
+- Verfügbar unter: `/system-status.php`
+- Diese Seite ist absichtlich **nirgendwo verlinkt** und nur per direktem Aufruf erreichbar.
