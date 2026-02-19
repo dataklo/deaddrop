@@ -145,8 +145,8 @@ systemctl enable clamav-daemon || true
 systemctl restart clamav-daemon || true
 
 # Deploy web
-mkdir -p /var/www/deaddrop/upload /var/www/deaddrop/daten /var/www/deaddrop/webftp
 rsync -a --delete "$REPO_ROOT/webroot/" /var/www/deaddrop/
+mkdir -p /var/www/deaddrop/upload /var/www/deaddrop/daten /var/www/deaddrop/webftp
 
 # Root and data read-only for anonymous ftp; upload write-only
 chown -R root:root /var/www/deaddrop
