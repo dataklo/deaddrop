@@ -1,0 +1,11 @@
+[Match]
+Name=eth1
+
+[Network]
+Address=172.16.0.1/24
+DHCPServer=no
+IPv6AcceptRA=no
+LinkLocalAddressing=no
+
+# no default route via eth1
+ConfigureWithoutCarrier=yes
