@@ -39,6 +39,19 @@ Ausführbare Typen (`exe`, `msi`, `bat`, `cmd`, `ps1`, `jar`, `vbs`, `js`, `sh` 
 - `/upload`: write-only
 - anonymer User darf nicht löschen (vsftpd + Rechte)
 
+## Frische VM (Bootstrap)
+
+Ja — das Projekt ist auf eine frische Debian/Ubuntu-VM ausgelegt.
+
+```bash
+sudo -i
+apt update && apt dist-upgrade -y && apt install -y git
+cd /opt
+git clone https://github.com/dataklo/deaddrop.git
+cd deaddrop
+bash scripts/install.sh
+```
+
 ## Installation
 
 Interaktiv:
@@ -59,3 +72,17 @@ sudo bash scripts/install.sh --wan-if enp1s0 --lan-if enp7s0 --non-interactive
 - `http://deaddrop.internal`
 - `http://<WAN-IP-der-VM>`
 - WebFTP: `http://deaddrop.internal/webftp/`
+
+## Update-Funktion (für laufende Entwicklung)
+
+Für Updates gibt es jetzt ein separates Script, das `git pull` ausführt und anschließend neu deployt:
+
+```bash
+sudo bash scripts/update.sh
+```
+
+Optional mit festem Stand (Branch/Tag/Commit):
+
+```bash
+sudo bash scripts/update.sh --git-ref main
+```
