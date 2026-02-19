@@ -28,8 +28,13 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $NON_INTERACTIVE -eq 0 ]]; then
-  echo "Verfügbare Interfaces:"
-  ip -o link show | awk -F': ' '{print " - " $2}' | sed 's/@.*//'
+  echo "Verfügbare Interfaces (mit aktueller IPv4):"
+  while IFS= read -r iface; do
+    iface="${iface%@*}"
+    ipv4="$(ip -o -4 addr show dev "$iface" | awk '{print $4}' | paste -sd ',' -)"
+    [[ -z "$ipv4" ]] && ipv4="keine IPv4"
+    echo " - ${iface} (${ipv4})"
+  done < <(ip -o link show | awk -F': ' '{print $2}')
   [[ -z "$WAN_IFACE" ]] && read -rp "WAN Interface (DHCP): " WAN_IFACE
   [[ -z "$LAN_IFACE" ]] && read -rp "LAN Interface (DeadDrop): " LAN_IFACE
 fi
@@ -61,6 +66,8 @@ network:
     ${LAN_IFACE}:
       dhcp4: false
       dhcp6: false
+      accept-ra: false
+      link-local: []
       addresses: [172.16.0.1/24]
       optional: true
 NETPLAN
@@ -71,6 +78,7 @@ netplan apply || true
 sysctl -w net.ipv4.ip_forward=0 >/dev/null
 cat >/etc/sysctl.d/99-deaddrop.conf <<SYSCTL
 net.ipv4.ip_forward = 0
+net.ipv6.conf.${LAN_IFACE}.disable_ipv6 = 1
 SYSCTL
 
 cat >/etc/nftables.conf <<NFT
@@ -144,7 +152,7 @@ systemctl restart vsftpd
 cat <<MSG
 Fertig.
 - WAN: ${WAN_IFACE} via DHCP (VM bleibt updatefähig)
-- LAN: ${LAN_IFACE} = 172.16.0.1/24, komplett ohne Internet-Forwarding
+- LAN: ${LAN_IFACE} = 172.16.0.1/24, IPv6 deaktiviert, komplett ohne Internet-Forwarding
 - DNS wildcard + Captive auf LAN
 - WebFTP Root: http://deaddrop.internal/webftp/
 - Upload-Flow: /upload (write-only) -> AV-Scan -> /daten (read-only)

@@ -4,7 +4,7 @@
 
 - **Nach Installation offline betreibbar** (alle benötigten Inhalte lokal auf der VM)
 - **WAN Interface**: DHCP für Updates/Admin
-- **LAN Interface**: isoliert (`172.16.0.1/24`), **keine Internet-Weiterleitung**
+- **LAN Interface**: isoliert (`172.16.0.1/24`), **IPv6 aus**, **keine Internet-Weiterleitung**
 - DNS auf LAN löst alles lokal auf `172.16.0.1`
 - Canonical URL + Redirect auf `http://deaddrop.internal`
 - WebFTP + normaler FTP-Client (anonym)
@@ -13,6 +13,7 @@
 
 - `nftables` setzt `forward` Policy auf `drop`
 - `net.ipv4.ip_forward=0`
+- `net.ipv6.conf.<LAN_IF>.disable_ipv6=1` + kein IPv6-RA/link-local auf LAN
 - dadurch kein Routing LAN -> WAN
 - LAN-Clients bekommen niemals Internet über diese VM
 
