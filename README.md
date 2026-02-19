@@ -23,8 +23,14 @@
 2. Upload-Button oben rechts
 3. Datei landet zuerst in `/upload` (write-only für anonyme FTP-Clients)
 4. `clamscan` prüft Datei
-5. saubere Datei wird nach `/daten` verschoben
-6. auffällige Datei wird **ohne Kommentar gelöscht**
+5. saubere Datei wird nach `/daten/JJJJ-MM-TT/` verschoben
+6. gleicher Dateiname am selben Tag wird durch den neuen Upload ersetzt
+7. auffällige Datei wird **ohne Kommentar gelöscht**
+
+Die WebFTP-Ansicht bietet zusätzlich:
+- Dropdown-Filter nach Upload-Tag
+- Soft-Delete-Button (Dateien werden nur ausgeblendet, nicht physisch gelöscht)
+- optionale Telegram-Benachrichtigung bei Uploads (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_CHAT_ID`)
 
 ## Dateiregeln
 
