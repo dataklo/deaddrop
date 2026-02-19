@@ -140,7 +140,9 @@ systemctl enable dnsmasq
 systemctl restart dnsmasq
 
 # AV signatures once at install-time; afterwards system can run offline
+systemctl stop clamav-freshclam 2>/dev/null || true
 freshclam || true
+systemctl start clamav-freshclam 2>/dev/null || true
 systemctl enable clamav-daemon || true
 systemctl restart clamav-daemon || true
 
@@ -167,6 +169,7 @@ ln -sf /etc/nginx/sites-available/deaddrop.conf /etc/nginx/sites-enabled/deaddro
 
 PHP_FPM_SERVICE="$(systemctl list-unit-files | awk '/php[0-9.]+-fpm.service/ {print $1; exit}')"
 [[ -z "${PHP_FPM_SERVICE:-}" ]] && { echo "Kein php-fpm Service gefunden."; exit 1; }
+nginx -t
 systemctl enable "$PHP_FPM_SERVICE" nginx
 systemctl restart "$PHP_FPM_SERVICE" nginx
 
