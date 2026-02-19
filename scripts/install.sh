@@ -10,10 +10,12 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WAN_IFACE=""
 LAN_IFACE=""
 NON_INTERACTIVE=0
+PRESERVE_RUNTIME_DIRS=0
 
 usage() {
   cat <<USAGE
 Usage: sudo bash scripts/install.sh [--wan-if <iface>] [--lan-if <iface>] [--non-interactive]
+       sudo bash scripts/install.sh [--preserve-runtime-dirs]
 USAGE
 }
 
@@ -22,6 +24,7 @@ while [[ $# -gt 0 ]]; do
     --wan-if) WAN_IFACE="${2:-}"; shift 2 ;;
     --lan-if) LAN_IFACE="${2:-}"; shift 2 ;;
     --non-interactive) NON_INTERACTIVE=1; shift ;;
+    --preserve-runtime-dirs) PRESERVE_RUNTIME_DIRS=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) echo "Unbekanntes Argument: $1" >&2; usage; exit 1 ;;
   esac
@@ -147,15 +150,26 @@ systemctl enable clamav-daemon || true
 systemctl restart clamav-daemon || true
 
 # Deploy web
-rsync -a --delete "$REPO_ROOT/webroot/" /var/www/deaddrop/
+RSYNC_ARGS=(-a --delete)
+if [[ $PRESERVE_RUNTIME_DIRS -eq 1 ]]; then
+  RSYNC_ARGS+=(--filter='P /upload/***' --filter='P /daten/***')
+fi
+rsync "${RSYNC_ARGS[@]}" "$REPO_ROOT/webroot/" /var/www/deaddrop/
 mkdir -p /var/www/deaddrop/upload /var/www/deaddrop/daten /var/www/deaddrop/webftp
 
 # Root and data read-only for anonymous ftp; upload write-only
-chown -R root:root /var/www/deaddrop
+if [[ $PRESERVE_RUNTIME_DIRS -eq 1 ]]; then
+  find /var/www/deaddrop \
+    -path /var/www/deaddrop/upload -prune -o \
+    -path /var/www/deaddrop/daten -prune -o \
+    -exec chown root:root {} +
+else
+  chown -R root:root /var/www/deaddrop
+  chmod 0555 /var/www/deaddrop/daten
+  chown -R www-data:www-data /var/www/deaddrop/upload
+  chmod 0733 /var/www/deaddrop/upload
+fi
 chmod 0555 /var/www/deaddrop
-chmod 0555 /var/www/deaddrop/daten
-chown -R www-data:www-data /var/www/deaddrop/upload
-chmod 0733 /var/www/deaddrop/upload
 chown -R www-data:www-data /var/www/deaddrop/webftp
 chmod -R 0755 /var/www/deaddrop/webftp
 chmod 0644 /var/www/deaddrop/*.html /var/www/deaddrop/*.txt /var/www/deaddrop/*.md /var/www/deaddrop/*.css || true
